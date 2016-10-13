@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"errors"
+
 	"github.com/firefirestyle/gominioauth/twitter"
 	"google.golang.org/appengine"
 )
@@ -20,9 +22,14 @@ const (
 	UrlTwitterTokenCallback_callbackUrl                 = "cb"
 )
 
-var twitterHandlerObj = NewTwitterHandler(TwitterConsumerKey, TwitterConsumerSecret, TwitterAccessToken, TwitterAccessTokenSecret)
+var twitterHandlerObj = NewTwitterHandler(TwitterOAuthConfig{
+	ConsumerKey:       TwitterConsumerKey,
+	ConsumerSecret:    TwitterConsumerSecret,
+	AccessToken:       TwitterAccessToken,
+	AccessTokenSecret: TwitterAccessTokenSecret}, nil, nil)
+
 var l = map[string]func(http.ResponseWriter, *http.Request){
-	UrlTwitterTokenUrlRedirect: twitterHandlerObj.twitterLoginEntry, //()func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("Welcome to!!")) },
+	UrlTwitterTokenUrlRedirect: twitterHandlerObj.TwitterLoginEntry, //()func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("Welcome to!!")) },
 }
 
 func init() {
@@ -45,14 +52,26 @@ func initApi() {
 // ---
 //  twitter
 // ---
-type TwitterHandler struct {
-	twitterManager *twitter.TwitterManager
+type TwitterOAuthConfig struct {
+	ConsumerKey       string
+	ConsumerSecret    string
+	AccessToken       string
+	AccessTokenSecret string
 }
 
-func NewTwitterHandler(consumerKey string, consumerSecret string, accessToken string, accessTokenSecret string) *TwitterHandler {
+type TwitterHandler struct {
+	twitterManager *twitter.TwitterManager
+	onRequest      func(url.Values) map[string]string
+	onFoundUser    func(url.Values, *twitter.SendAccessTokenResult) map[string]string
+}
+
+func NewTwitterHandler(config TwitterOAuthConfig, onRequest func(url.Values) map[string]string,
+	onFoundUser func(url.Values, *twitter.SendAccessTokenResult) map[string]string) *TwitterHandler {
 	twitterHandlerObj := new(TwitterHandler)
 	twitterHandlerObj.twitterManager = twitter.NewTwitterManager( //
-		consumerKey, consumerSecret, accessToken, accessTokenSecret)
+		config.ConsumerKey, config.ConsumerSecret, config.AccessToken, config.AccessTokenSecret)
+	twitterHandlerObj.onFoundUser = onFoundUser
+	twitterHandlerObj.onRequest = onRequest
 	return twitterHandlerObj
 }
 
@@ -78,7 +97,7 @@ func (obj *TwitterHandler) MakeUrlFailedToMakeToken(baseAddr string) (string, er
 	return urlObj.String(), nil
 }
 
-func (obj *TwitterHandler) twitterLoginEntry(w http.ResponseWriter, r *http.Request) {
+func (obj *TwitterHandler) TwitterLoginEntry(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	values := r.URL.Query()
 
@@ -87,9 +106,20 @@ func (obj *TwitterHandler) twitterLoginEntry(w http.ResponseWriter, r *http.Requ
 	if callbackUrl == "" {
 		redirectUrl, _ = obj.MakeUrlNotFoundCallbackError(r.RemoteAddr)
 	} else {
-		twitterObj := obj.twitterManager.NewTwitter()
+		//
 		twitterCallback := "http://" + appengine.DefaultVersionHostname(ctx) + UrlApiRoot + UrlTwitterTokenCallback + "?" + UrlTwitterTokenCallback_callbackUrl + "=" + url.QueryEscape(callbackUrl)
-		oauthResult, err := twitterObj.SendRequestToken(ctx, twitterCallback)
+		twitterCallbackObj, _ := url.Parse(twitterCallback)
+		if obj.onRequest != nil {
+			twitterCallbackValues := twitterCallbackObj.Query()
+			opts := obj.onRequest(r.URL.Query())
+			for k, v := range opts {
+				twitterCallbackValues.Add(k, v)
+			}
+			twitterCallbackObj.RawQuery = twitterCallbackValues.Encode()
+		}
+		//
+		twitterObj := obj.twitterManager.NewTwitter()
+		oauthResult, err := twitterObj.SendRequestToken(ctx, twitterCallbackObj.String())
 		if err != nil {
 			urlPattern1, errPattern1 := obj.MakeUrlFailedToMakeToken(callbackUrl)
 			if errPattern1 != nil {
@@ -102,4 +132,51 @@ func (obj *TwitterHandler) twitterLoginEntry(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	http.Redirect(w, r, redirectUrl, http.StatusFound)
+}
+
+func (obj *TwitterHandler) TwitterLoginExit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	ctx := appengine.NewContext(r)
+	//
+	//
+	callbackUrl := r.URL.Query().Get(UrlTwitterTokenCallback_callbackUrl)
+	urlObj, err := url.Parse(callbackUrl)
+	if err != nil {
+		removeUrlObj, _ := url.Parse(r.RemoteAddr)
+		query := removeUrlObj.Query()
+		query.Add("error", "error")
+		removeUrlObj.RawQuery = query.Encode()
+		http.Redirect(w, r, removeUrlObj.String(), http.StatusFound)
+		return
+	}
+	//
+	//
+	twitterObj := obj.twitterManager.NewTwitter()
+	rt, err := twitterObj.OnCallbackSendRequestToken(ctx, r.URL)
+	if err != nil || rt.GetScreenName() == "" || rt.GetUserID() == "" {
+		rt = nil
+		if err == nil && (rt.GetScreenName() == "" || rt.GetUserID() == "") {
+			err = errors.New("empty user")
+		}
+	}
+
+	if obj.onFoundUser != nil {
+		values := urlObj.Query()
+		opts := obj.onFoundUser(r.URL.Query(), rt)
+		for k, v := range opts {
+			values.Add(k, v)
+		}
+		urlObj.RawQuery = values.Encode()
+	}
+	//
+
+	if err != nil {
+		query := urlObj.Query()
+		query.Add("error", "oauth")
+		urlObj.RawQuery = query.Encode()
+		http.Redirect(w, r, urlObj.String(), http.StatusFound)
+		return
+	} else {
+		http.Redirect(w, r, urlObj.String(), http.StatusFound)
+	}
 }
