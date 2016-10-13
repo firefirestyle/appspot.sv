@@ -7,7 +7,8 @@ import (
 	//	"errors"
 
 	"github.com/firefirestyle/gominioauth/twitter"
-	//	"google.golang.org/appengine"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
 )
 
 const (
@@ -22,15 +23,18 @@ const (
 	UrlTwitterTokenCallback_callbackUrl                 = "cb"
 )
 
-var twitterHandlerObj = twitter.NewTwitterHandler("https://firefirestyle.appspot.com"+UrlApiRoot+"/"+UrlTwitterTokenCallback, twitter.TwitterOAuthConfig{
-	ConsumerKey:       TwitterConsumerKey,
-	ConsumerSecret:    TwitterConsumerSecret,
-	AccessToken:       TwitterAccessToken,
-	AccessTokenSecret: TwitterAccessTokenSecret}, nil, nil)
+var twitterHandlerObj *twitter.TwitterHandler = nil
 
-var l = map[string]func(http.ResponseWriter, *http.Request){
-	UrlTwitterTokenUrlRedirect: twitterHandlerObj.TwitterLoginEntry,
-	UrlTwitterTokenCallback:    twitterHandlerObj.TwitterLoginExit,
+func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
+	if twitterHandlerObj == nil {
+		twitterHandlerObj = twitter.NewTwitterHandler( //
+			"http://"+appengine.DefaultVersionHostname(ctx)+""+UrlApiRoot+"/"+UrlTwitterTokenCallback, twitter.TwitterOAuthConfig{
+				ConsumerKey:       TwitterConsumerKey,
+				ConsumerSecret:    TwitterConsumerSecret,
+				AccessToken:       TwitterAccessToken,
+				AccessTokenSecret: TwitterAccessTokenSecret}, nil, nil)
+	}
+	return twitterHandlerObj
 }
 
 func init() {
@@ -45,7 +49,10 @@ func initHomepage() {
 }
 
 func initApi() {
-	for k, v := range l {
-		http.HandleFunc(UrlApiRoot+"/"+k, v)
-	}
+	http.HandleFunc(UrlApiRoot+"/"+UrlTwitterTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
+		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginEntry(w, r)
+	})
+	http.HandleFunc(UrlApiRoot+"/"+UrlTwitterTokenCallback, func(w http.ResponseWriter, r *http.Request) {
+		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginExit(w, r)
+	})
 }
