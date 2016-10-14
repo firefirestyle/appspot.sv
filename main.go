@@ -50,9 +50,11 @@ func initHomepage() {
 
 func initApi() {
 	http.HandleFunc(UrlApiRoot+"/"+UrlTwitterTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
+		//	w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginEntry(w, r)
 	})
 	http.HandleFunc(UrlApiRoot+"/"+UrlTwitterTokenCallback, func(w http.ResponseWriter, r *http.Request) {
+		//	w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginExit(w, r)
 	})
 }
