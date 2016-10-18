@@ -48,7 +48,7 @@ func GetUserMgrObj(ctx context.Context) *miniuser.UserManager {
 		userMgrObj = miniuser.NewUserManager(miniuser.UserManagerConfig{
 			ProjectId:   "firefirestyle",
 			UserKind:    "user",
-			SessionKind: "user-session",
+			RelayIdKind: "relayId",
 		})
 	}
 	return userMgrObj
