@@ -9,6 +9,8 @@ import (
 	"github.com/firefirestyle/go.miniblob"
 	"github.com/firefirestyle/go.minioauth/twitter"
 	"github.com/firefirestyle/go.minisession"
+	"github.com/firefirestyle/go.miniuser"
+	//
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
@@ -39,6 +41,18 @@ const (
 var twitterHandlerObj *twitter.TwitterHandler = nil
 var blobHandlerObj *miniblob.BlobHandler = nil
 var sessionMgrObj *minisession.SessionManager = nil
+var userMgrObj *miniuser.UserManager = nil
+
+func GetUserMgrObj(ctx context.Context) *miniuser.UserManager {
+	if userMgrObj == nil {
+		userMgrObj = miniuser.NewUserManager(miniuser.UserManagerConfig{
+			ProjectId:   "firefirestyle",
+			UserKind:    "user",
+			SessionKind: "user-session",
+		})
+	}
+	return userMgrObj
+}
 
 func GetSessionMgrObj(ctx context.Context) *minisession.SessionManager {
 	if sessionMgrObj == nil {
@@ -75,11 +89,23 @@ func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 				OnFoundUser: func(w http.ResponseWriter, r *http.Request, handler *twitter.TwitterHandler, accesssToken *twitter.SendAccessTokenResult) map[string]string {
 					ctx := appengine.NewContext(r)
 					sessionMgrObj := GetSessionMgrObj(ctx)
-					tokenObj, err := sessionMgrObj.Login(ctx, twitter.ScreenName, minisession.MakeAccessTokenConfigFromRequest(r))
+					tokenObj, err := sessionMgrObj.Login(ctx, //
+						accesssToken.GetScreenName(), //
+						minisession.MakeAccessTokenConfigFromRequest(r))
 					if err != nil {
 						return map[string]string{"errcode": "1"}
+					}
+
+					userMgrObj := GetUserMgrObj(ctx)
+					//_, userSessionObj, userObj. :=
+					_, _, userObj, err1 := userMgrObj.LoginRegistFromTwitter(ctx, //
+						accesssToken.GetScreenName(), //
+						accesssToken.GetUserID(),     //
+						accesssToken.GetOAuthToken()) //
+					if err1 != nil {
+						return map[string]string{"errcode": "2", "errindo": err1.Error()}
 					} else {
-						return map[string]string{"token": "" + tokenObj.GetLoginId()}
+						return map[string]string{"token": "" + tokenObj.GetLoginId(), "userName": userObj.GetUserName()}
 					}
 				},
 			})
