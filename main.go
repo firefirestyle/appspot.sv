@@ -8,8 +8,14 @@ import (
 
 	"github.com/firefirestyle/go.miniblob"
 	"github.com/firefirestyle/go.minioauth/twitter"
+	"github.com/firefirestyle/go.minisession"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+	//
+	"crypto/rand"
+	"encoding/binary"
+	"strconv"
 )
 
 const (
@@ -32,11 +38,22 @@ const (
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
 var blobHandlerObj *miniblob.BlobHandler = nil
+var sessionMgrObj *minisession.SessionManager = nil
+
+func GetSessionMgrObj(ctx context.Context) *minisession.SessionManager {
+	if sessionMgrObj == nil {
+		sessionMgrObj = minisession.NewSessionManager(minisession.SessionManagerConfig{
+			ProjectId: "firefirestyle",
+			Kind:      "session",
+		})
+	}
+	return sessionMgrObj
+}
 
 func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 	if blobHandlerObj == nil {
 		blobHandlerObj = miniblob.NewBlobHandler(
-			UrlApiRoot+"/"+UrlBlobCallback, "secret sign", //
+			UrlApiRoot+"/"+UrlBlobCallback, appengine.VersionID(ctx), //
 			miniblob.BlobManagerConfig{
 				ProjectId:   "firefirestyle",
 				Kind:        "blobstore",
@@ -54,7 +71,18 @@ func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 				ConsumerKey:       TwitterConsumerKey,
 				ConsumerSecret:    TwitterConsumerSecret,
 				AccessToken:       TwitterAccessToken,
-				AccessTokenSecret: TwitterAccessTokenSecret}, nil, nil)
+				AccessTokenSecret: TwitterAccessTokenSecret}, twitter.TwitterHundlerOnEvent{
+				OnFoundUser: func(w http.ResponseWriter, r *http.Request, handler *twitter.TwitterHandler, accesssToken *twitter.SendAccessTokenResult) map[string]string {
+					ctx := appengine.NewContext(r)
+					sessionMgrObj := GetSessionMgrObj(ctx)
+					tokenObj, err := sessionMgrObj.Login(ctx, twitter.ScreenName, minisession.MakeAccessTokenConfigFromRequest(r))
+					if err != nil {
+						return map[string]string{"errcode": "1"}
+					} else {
+						return map[string]string{"token": "" + tokenObj.GetLoginId()}
+					}
+				},
+			})
 	}
 	return twitterHandlerObj
 }
@@ -66,6 +94,7 @@ func init() {
 
 func initHomepage() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Infof(appengine.NewContext(r), ">> "+makeRandomId())
 		w.Write([]byte("Welcome to FireFireStyle!!"))
 	})
 }
@@ -88,4 +117,10 @@ func initApi() {
 		GetBlobHandlerObj(appengine.NewContext(r)).HandleUploaded(w, r)
 	})
 
+}
+
+func makeRandomId() string {
+	var n uint64
+	binary.Read(rand.Reader, binary.LittleEndian, &n)
+	return strconv.FormatUint(n, 36)
 }
