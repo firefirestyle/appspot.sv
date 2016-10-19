@@ -128,23 +128,23 @@ func initHomepage() {
 
 func initApi() {
 	http.HandleFunc(UrlTwitterTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
-		//	w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginEntry(w, r)
 	})
 	http.HandleFunc(UrlTwitterTokenCallback, func(w http.ResponseWriter, r *http.Request) {
-		//	w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginExit(w, r)
 	})
 	http.HandleFunc(UrlBlobRequestUrl, func(w http.ResponseWriter, r *http.Request) {
-		//	w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetBlobHandlerObj(appengine.NewContext(r)).BlobRequestToken(w, r)
 	})
 	http.HandleFunc(UrlBlobCallback, func(w http.ResponseWriter, r *http.Request) {
-		//	w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetBlobHandlerObj(appengine.NewContext(r)).HandleUploaded(w, r)
 	})
 	http.HandleFunc(UrlUserGetUrl, func(w http.ResponseWriter, r *http.Request) {
-		//	w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetUserMgrObj(appengine.NewContext(r)).HandleGet(w, r)
 	})
 }
