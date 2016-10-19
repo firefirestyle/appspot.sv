@@ -21,37 +21,38 @@ import (
 )
 
 const (
-	UrlApiRoot = "/api/v1"
-)
-
-const (
-	UrlTwitterTokenUrlRedirect                          = "twitter/tokenurl/redirect"
 	UrlTwitterTokenUrlRedirect_callbackUrl              = "cb"
 	UrlTwitterTokenUrlRedirect_errorNotFoundCallbackUrl = "1001"
 	UrlTwitterTokenUrlRedirect_errorFailedToMakeToken   = "1002"
-	UrlTwitterTokenCallback                             = "twitter/tokenurl/callback"
 	UrlTwitterTokenCallback_callbackUrl                 = "cb"
 )
 
 const (
-	UrlBlobRequestUrl = "blob/requesturl"
-	UrlBlobCallback   = "blob/callback"
+	UrlTwitterTokenUrlRedirect = "/api/v1/twitter/tokenurl/redirect"
+	UrlTwitterTokenCallback    = "/api/v1/twitter/tokenurl/callback"
+
+	UrlBlobRequestUrl = "/api/v1/blob/requesturl"
+	UrlBlobCallback   = "/api/v1/blob/callback"
+
+	UrlUserGetUrl = "/api/v1/user/get"
+
+//	UrlBlobCallback   = "/api/v1/blob/callback"
 )
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
 var blobHandlerObj *miniblob.BlobHandler = nil
 var sessionMgrObj *minisession.SessionManager = nil
-var userMgrObj *miniuser.UserManager = nil
+var userHandlerObj *miniuser.UserHandler = nil
 
-func GetUserMgrObj(ctx context.Context) *miniuser.UserManager {
-	if userMgrObj == nil {
-		userMgrObj = miniuser.NewUserManager(miniuser.UserManagerConfig{
+func GetUserMgrObj(ctx context.Context) *miniuser.UserHandler {
+	if userHandlerObj == nil {
+		userHandlerObj = miniuser.NewUserHandler(miniuser.UserManagerConfig{
 			ProjectId:   "firefirestyle",
 			UserKind:    "user",
 			RelayIdKind: "relayId",
-		})
+		}, miniuser.UserHandlerOnEvent{})
 	}
-	return userMgrObj
+	return userHandlerObj
 }
 
 func GetSessionMgrObj(ctx context.Context) *minisession.SessionManager {
@@ -67,7 +68,7 @@ func GetSessionMgrObj(ctx context.Context) *minisession.SessionManager {
 func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 	if blobHandlerObj == nil {
 		blobHandlerObj = miniblob.NewBlobHandler(
-			UrlApiRoot+"/"+UrlBlobCallback, appengine.VersionID(ctx), //
+			UrlBlobCallback, appengine.VersionID(ctx), //
 			miniblob.BlobManagerConfig{
 				ProjectId:   "firefirestyle",
 				Kind:        "blobstore",
@@ -81,7 +82,7 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 	if twitterHandlerObj == nil {
 		twitterHandlerObj = twitter.NewTwitterHandler( //
-			"http://"+appengine.DefaultVersionHostname(ctx)+""+UrlApiRoot+"/"+UrlTwitterTokenCallback, twitter.TwitterOAuthConfig{
+			"http://"+appengine.DefaultVersionHostname(ctx)+""+UrlTwitterTokenCallback, twitter.TwitterOAuthConfig{
 				ConsumerKey:       TwitterConsumerKey,
 				ConsumerSecret:    TwitterConsumerSecret,
 				AccessToken:       TwitterAccessToken,
@@ -98,7 +99,7 @@ func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 
 					userMgrObj := GetUserMgrObj(ctx)
 					//_, userSessionObj, userObj. :=
-					_, _, userObj, err1 := userMgrObj.LoginRegistFromTwitter(ctx, //
+					_, _, userObj, err1 := userMgrObj.GetManager().LoginRegistFromTwitter(ctx, //
 						accesssToken.GetScreenName(), //
 						accesssToken.GetUserID(),     //
 						accesssToken.GetOAuthToken()) //
@@ -126,23 +127,26 @@ func initHomepage() {
 }
 
 func initApi() {
-	http.HandleFunc(UrlApiRoot+"/"+UrlTwitterTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(UrlTwitterTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
 		//	w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginEntry(w, r)
 	})
-	http.HandleFunc(UrlApiRoot+"/"+UrlTwitterTokenCallback, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(UrlTwitterTokenCallback, func(w http.ResponseWriter, r *http.Request) {
 		//	w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginExit(w, r)
 	})
-	http.HandleFunc(UrlApiRoot+"/"+UrlBlobRequestUrl, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(UrlBlobRequestUrl, func(w http.ResponseWriter, r *http.Request) {
 		//	w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetBlobHandlerObj(appengine.NewContext(r)).BlobRequestToken(w, r)
 	})
-	http.HandleFunc(UrlApiRoot+"/"+UrlBlobCallback, func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(UrlBlobCallback, func(w http.ResponseWriter, r *http.Request) {
 		//	w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetBlobHandlerObj(appengine.NewContext(r)).HandleUploaded(w, r)
 	})
-
+	http.HandleFunc(UrlUserGetUrl, func(w http.ResponseWriter, r *http.Request) {
+		//	w.Header().Add("Access-Control-Allow-Origin", "*")
+		GetUserMgrObj(appengine.NewContext(r)).HandleGet(w, r)
+	})
 }
 
 func makeRandomId() string {
