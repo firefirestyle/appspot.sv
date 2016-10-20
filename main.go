@@ -8,16 +8,18 @@ import (
 
 	"github.com/firefirestyle/go.miniblob"
 	"github.com/firefirestyle/go.minioauth/twitter"
+	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
 	"github.com/firefirestyle/go.miniuser"
 	//
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
+	//	"google.golang.org/appengine/log"
 	//
-	"crypto/rand"
-	"encoding/binary"
-	"strconv"
+	//"crypto/rand"
+	//"encoding/binary"
+	//"strconv"
+	"io/ioutil"
 )
 
 const (
@@ -35,8 +37,7 @@ const (
 	UrlBlobCallback   = "/api/v1/blob/callback"
 
 	UrlUserGetUrl = "/api/v1/user/get"
-
-//	UrlBlobCallback   = "/api/v1/blob/callback"
+	UrlMeLogout   = "/api/v1/me/logout"
 )
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
@@ -121,7 +122,6 @@ func init() {
 
 func initHomepage() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Infof(appengine.NewContext(r), ">> "+makeRandomId())
 		w.Write([]byte("Welcome to FireFireStyle!!"))
 	})
 }
@@ -147,10 +147,13 @@ func initApi() {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetUserMgrObj(appengine.NewContext(r)).HandleGet(w, r)
 	})
-}
+	http.HandleFunc(UrlMeLogout, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		propObj := miniprop.NewMiniPropFromJson(bodyBytes)
+		token := propObj.GetString("token", "")
+		ctx := appengine.NewContext(r)
+		GetSessionMgrObj(ctx).Logout(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+	})
 
-func makeRandomId() string {
-	var n uint64
-	binary.Read(rand.Reader, binary.LittleEndian, &n)
-	return strconv.FormatUint(n, 36)
 }
