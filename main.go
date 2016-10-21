@@ -14,7 +14,7 @@ import (
 	//
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
-	//	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/log"
 	//
 	//"crypto/rand"
 	//"encoding/binary"
@@ -109,12 +109,6 @@ func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 				OnFoundUser: func(w http.ResponseWriter, r *http.Request, handler *twitter.TwitterHandler, accesssToken *twitter.SendAccessTokenResult) map[string]string {
 					ctx := appengine.NewContext(r)
 					sessionMgrObj := GetSessionMgrObj(ctx)
-					tokenObj, err := sessionMgrObj.Login(ctx, //
-						accesssToken.GetScreenName(), //
-						minisession.MakeAccessTokenConfigFromRequest(r))
-					if err != nil {
-						return map[string]string{"errcode": "1"}
-					}
 
 					userMgrObj := GetUserMgrObj(ctx)
 					//_, userSessionObj, userObj. :=
@@ -124,6 +118,12 @@ func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 						accesssToken.GetOAuthToken()) //
 					if err1 != nil {
 						return map[string]string{"errcode": "2", "errindo": err1.Error()}
+					}
+					tokenObj, err := sessionMgrObj.Login(ctx, //
+						userObj.GetUserName(), //
+						minisession.MakeAccessTokenConfigFromRequest(r))
+					if err != nil {
+						return map[string]string{"errcode": "1"}
 					} else {
 						return map[string]string{"token": "" + tokenObj.GetLoginId(), "userName": userObj.GetUserName()}
 					}
@@ -164,10 +164,11 @@ func initApi() {
 			propObj := miniprop.NewMiniPropFromJson(bodyBytes)
 			token := propObj.GetString("token", "")
 			ctx := appengine.NewContext(r)
+
 			loginCheckInfo := GetSessionMgrObj(ctx).CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
 			if loginCheckInfo.IsLogin == false {
 				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("failed to wrong token"))
+				w.Write([]byte("failed to wrong token : (1)"))
 				return
 			}
 			//
@@ -176,12 +177,12 @@ func initApi() {
 			if true == strings.HasPrefix(dir, "/user") {
 				if false == strings.HasPrefix(dir, "/user/"+loginCheckInfo.AccessTokenObj.GetUserName()) {
 					w.WriteHeader(http.StatusBadRequest)
-					w.Write([]byte("failed to wrong token"))
+					w.Write([]byte("failed to wrong token : (2) : " + dir))
 					return
 				}
 			} else {
 				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("failed to wrong dir"))
+				w.Write([]byte("failed to wrong dir : (3)"))
 			}
 		}
 		//
@@ -207,4 +208,8 @@ func initApi() {
 		GetSessionMgrObj(ctx).Logout(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
 	})
 
+}
+
+func Debug(ctx context.Context, message string) {
+	log.Infof(ctx, message)
 }
