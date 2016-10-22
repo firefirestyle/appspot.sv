@@ -19,8 +19,11 @@ import (
 	//"crypto/rand"
 	//"encoding/binary"
 	//"strconv"
+	"errors"
 	"io/ioutil"
 	"strings"
+
+	//	"google.golang.org/appengine/blobstore"
 )
 
 const (
@@ -79,7 +82,31 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 				CallbackUrl: UrlBlobCallback,
 			},
 			miniblob.BlobHandlerOnEvent{
-				OnComplete: func(w http.ResponseWriter, r *http.Request, blobHandlerObj *miniblob.BlobHandler, blobObj *miniblob.BlobItem) error {
+				OnRequest: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *miniblob.BlobHandler) (string, map[string]string, error) {
+					//
+					// login check
+					bodyBytes, _ := ioutil.ReadAll(r.Body)
+					propObj := miniprop.NewMiniPropFromJson(bodyBytes)
+					token := propObj.GetString("token", "")
+					ctx := appengine.NewContext(r)
+
+					loginCheckInfo := GetSessionMgrObj(ctx).CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+					if loginCheckInfo.IsLogin == false {
+						return "", nil, errors.New("failed to wrong token : (1)")
+					}
+					//
+					// path check
+					dir := r.URL.Query().Get("dir")
+					if true == strings.HasPrefix(dir, "/user") {
+						if false == strings.HasPrefix(dir, "/user/"+loginCheckInfo.AccessTokenObj.GetUserName()) {
+							return "", nil, errors.New("failed to wrong token : (2)")
+						}
+					} else {
+						return "", nil, errors.New("failed to wrong token : (3)")
+					}
+					return loginCheckInfo.AccessTokenObj.GetLoginId(), map[string]string{}, nil
+				},
+				OnComplete: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *miniblob.BlobHandler, blobObj *miniblob.BlobItem) error {
 					dir := r.URL.Query().Get("dir")
 					if true == strings.HasPrefix(dir, "/user") {
 						ctx := appengine.NewContext(r)
@@ -87,11 +114,14 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 						userMgrObj := GetUserMgrObj(ctx)
 						userObj, userErr := userMgrObj.GetManager().GetUserFromUserName(ctx, userName)
 						if userErr != nil {
+							outputProp.SetString("error", "not found user")
 							return userErr
 						}
 						userObj.SetIconUrl("key://" + blobObj.GetBlobKey())
+						return nil
+					} else {
+						return errors.New("unsupport")
 					}
-					return nil
 				},
 			})
 	}
@@ -155,38 +185,6 @@ func initApi() {
 	})
 	http.HandleFunc(UrlBlobRequestUrl, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
-		//
-		// permission check
-		{
-			//
-			// login check
-			bodyBytes, _ := ioutil.ReadAll(r.Body)
-			propObj := miniprop.NewMiniPropFromJson(bodyBytes)
-			token := propObj.GetString("token", "")
-			ctx := appengine.NewContext(r)
-
-			loginCheckInfo := GetSessionMgrObj(ctx).CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
-			if loginCheckInfo.IsLogin == false {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("failed to wrong token : (1)"))
-				return
-			}
-			//
-			// path check
-			dir := r.URL.Query().Get("dir")
-			if true == strings.HasPrefix(dir, "/user") {
-				if false == strings.HasPrefix(dir, "/user/"+loginCheckInfo.AccessTokenObj.GetUserName()) {
-					w.WriteHeader(http.StatusBadRequest)
-					w.Write([]byte("failed to wrong token : (2) : " + dir))
-					return
-				}
-			} else {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("failed to wrong dir : (3)"))
-			}
-		}
-		//
-		//
 		GetBlobHandlerObj(appengine.NewContext(r)).BlobRequestToken(w, r)
 	})
 
