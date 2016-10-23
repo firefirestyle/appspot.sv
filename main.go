@@ -10,7 +10,7 @@ import (
 	"github.com/firefirestyle/go.minioauth/twitter"
 	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
-	"github.com/firefirestyle/go.miniuser"
+	//	"github.com/firefirestyle/go.miniuser"
 	userhundler "github.com/firefirestyle/go.miniuser/hundler"
 	//
 	"golang.org/x/net/context"
@@ -53,7 +53,7 @@ var userHandlerObj *userhundler.UserHandler = nil
 
 func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 	if userHandlerObj == nil {
-		userHandlerObj = userhundler.NewUserHandler(miniuser.UserManagerConfig{
+		userHandlerObj = userhundler.NewUserHandler(userhundler.UserHandlerManagerConfig{
 			ProjectId:   "firefirestyle",
 			UserKind:    "user",
 			RelayIdKind: "relayId",
@@ -112,13 +112,13 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 						ctx := appengine.NewContext(r)
 						userName := strings.Replace(dir, "/user/", "", -1)
 						userMgrObj := GetUserHundlerObj(ctx)
-						userObj, userErr := userMgrObj.GetUserFromUserNamePointer(ctx, userName)
+						userObj, userErr := userMgrObj.GetUserFromUserNameAndRelayId(ctx, userName)
 						if userErr != nil {
 							outputProp.SetString("error", "not found user")
 							return userErr
 						}
 						userObj.SetIconUrl("key://" + blobObj.GetBlobKey())
-						GetUserHundlerObj(ctx).SaveUserFromSession(ctx, userObj)
+						GetUserHundlerObj(ctx).SaveUserWithImmutable(ctx, userObj)
 						return nil
 					} else {
 						return errors.New("unsupport")
