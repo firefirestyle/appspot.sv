@@ -11,6 +11,7 @@ import (
 	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
 	"github.com/firefirestyle/go.miniuser"
+	userhundler "github.com/firefirestyle/go.miniuser/hundler"
 	//
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
@@ -39,25 +40,24 @@ const (
 
 	UrlBlobRequestUrl = "/api/v1/blob/requesturl"
 	UrlBlobCallback   = "/api/v1/blob/callback"
-
-	UrlUserGet  = "/api/v1/user/get"
-	UrlMeLogout = "/api/v1/me/logout"
-
-//	UrlMeUpdateIcon = "/api/v1/me/update-icon"
+	UrlBlobGet        = "/api/v1/blob/get"
+	UrlUserGet        = "/api/v1/user/get"
+	UrlUserFind       = "/api/v1/user/find"
+	UrlMeLogout       = "/api/v1/me/logout"
 )
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
 var blobHandlerObj *miniblob.BlobHandler = nil
 var sessionMgrObj *minisession.SessionManager = nil
-var userHandlerObj *miniuser.UserHandler = nil
+var userHandlerObj *userhundler.UserHandler = nil
 
-func GetUserMgrObj(ctx context.Context) *miniuser.UserHandler {
+func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 	if userHandlerObj == nil {
-		userHandlerObj = miniuser.NewUserHandler(miniuser.UserManagerConfig{
+		userHandlerObj = userhundler.NewUserHandler(miniuser.UserManagerConfig{
 			ProjectId:   "firefirestyle",
 			UserKind:    "user",
 			RelayIdKind: "relayId",
-		}, miniuser.UserHandlerOnEvent{})
+		}, userhundler.UserHandlerOnEvent{})
 	}
 	return userHandlerObj
 }
@@ -111,13 +111,14 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 					if true == strings.HasPrefix(dir, "/user") {
 						ctx := appengine.NewContext(r)
 						userName := strings.Replace(dir, "/user/", "", -1)
-						userMgrObj := GetUserMgrObj(ctx)
-						userObj, userErr := userMgrObj.GetManager().GetUserFromUserName(ctx, userName)
+						userMgrObj := GetUserHundlerObj(ctx)
+						userObj, userErr := userMgrObj.GetUserFromUserNamePointer(ctx, userName)
 						if userErr != nil {
 							outputProp.SetString("error", "not found user")
 							return userErr
 						}
 						userObj.SetIconUrl("key://" + blobObj.GetBlobKey())
+						GetUserHundlerObj(ctx).SaveUserFromSession(ctx, userObj)
 						return nil
 					} else {
 						return errors.New("unsupport")
@@ -140,9 +141,9 @@ func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 					ctx := appengine.NewContext(r)
 					sessionMgrObj := GetSessionMgrObj(ctx)
 
-					userMgrObj := GetUserMgrObj(ctx)
+					userMgrObj := GetUserHundlerObj(ctx)
 					//_, userSessionObj, userObj. :=
-					_, _, userObj, err1 := userMgrObj.GetManager().LoginRegistFromTwitter(ctx, //
+					_, _, userObj, err1 := userMgrObj.LoginRegistFromTwitter(ctx, //
 						accesssToken.GetScreenName(), //
 						accesssToken.GetUserID(),     //
 						accesssToken.GetOAuthToken()) //
@@ -155,7 +156,7 @@ func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 					if err != nil {
 						return map[string]string{"errcode": "1"}
 					} else {
-						return map[string]string{"token": "" + tokenObj.GetLoginId(), "userName": userObj.GetUserName()}
+						return map[string]string{"token": "" + tokenObj.GetLoginId(), "userName": userObj.GetOriginalUserName()}
 					}
 				},
 			})
@@ -175,6 +176,7 @@ func initHomepage() {
 }
 
 func initApi() {
+	// twitter
 	http.HandleFunc(UrlTwitterTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginEntry(w, r)
@@ -183,6 +185,7 @@ func initApi() {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginExit(w, r)
 	})
+	// blob
 	http.HandleFunc(UrlBlobRequestUrl, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetBlobHandlerObj(appengine.NewContext(r)).BlobRequestToken(w, r)
@@ -193,10 +196,22 @@ func initApi() {
 		GetBlobHandlerObj(appengine.NewContext(r)).HandleUploaded(w, r)
 	})
 
+	http.HandleFunc(UrlBlobGet, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		GetBlobHandlerObj(appengine.NewContext(r)).HandleGet(w, r)
+	})
+
+	// user
 	http.HandleFunc(UrlUserGet, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
-		GetUserMgrObj(appengine.NewContext(r)).HandleGet(w, r)
+		GetUserHundlerObj(appengine.NewContext(r)).HandleGet(w, r)
 	})
+	http.HandleFunc(UrlUserFind, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		GetUserHundlerObj(appengine.NewContext(r)).HandleGet(w, r)
+	})
+
+	// me
 	http.HandleFunc(UrlMeLogout, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
