@@ -57,19 +57,10 @@ func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 			ProjectId:   "firefirestyle",
 			UserKind:    "user",
 			RelayIdKind: "relayId",
+			SessionKind: "session",
 		}, userhundler.UserHandlerOnEvent{})
 	}
 	return userHandlerObj
-}
-
-func GetSessionMgrObj(ctx context.Context) *minisession.SessionManager {
-	if sessionMgrObj == nil {
-		sessionMgrObj = minisession.NewSessionManager(minisession.SessionManagerConfig{
-			ProjectId: "firefirestyle",
-			Kind:      "session",
-		})
-	}
-	return sessionMgrObj
 }
 
 func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
@@ -90,7 +81,7 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 					token := propObj.GetString("token", "")
 					ctx := appengine.NewContext(r)
 
-					loginCheckInfo := GetSessionMgrObj(ctx).CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+					loginCheckInfo := GetUserHundlerObj(ctx).GetSessionMgr().CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
 					if loginCheckInfo.IsLogin == false {
 						return "", nil, errors.New("failed to wrong token : (1)")
 					}
@@ -98,6 +89,7 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 					// path check
 					dir := r.URL.Query().Get("dir")
 					if true == strings.HasPrefix(dir, "/user") {
+						Debug(ctx, ">>>>>> AAA <<<<<<"+loginCheckInfo.AccessTokenObj.GetUserName())
 						if false == strings.HasPrefix(dir, "/user/"+loginCheckInfo.AccessTokenObj.GetUserName()) {
 							return "", nil, errors.New("failed to wrong token : (2)")
 						}
@@ -131,34 +123,12 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 
 func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 	if twitterHandlerObj == nil {
-		twitterHandlerObj = twitter.NewTwitterHandler( //
+		twitterHandlerObj = GetUserHundlerObj(ctx).GetTwitterHandlerObj(ctx, //
 			"http://"+appengine.DefaultVersionHostname(ctx)+""+UrlTwitterTokenCallback, twitter.TwitterOAuthConfig{
 				ConsumerKey:       TwitterConsumerKey,
 				ConsumerSecret:    TwitterConsumerSecret,
 				AccessToken:       TwitterAccessToken,
-				AccessTokenSecret: TwitterAccessTokenSecret}, twitter.TwitterHundlerOnEvent{
-				OnFoundUser: func(w http.ResponseWriter, r *http.Request, handler *twitter.TwitterHandler, accesssToken *twitter.SendAccessTokenResult) map[string]string {
-					ctx := appengine.NewContext(r)
-					sessionMgrObj := GetSessionMgrObj(ctx)
-
-					userMgrObj := GetUserHundlerObj(ctx)
-					//_, userSessionObj, userObj. :=
-					_, _, userObj, err1 := userMgrObj.LoginRegistFromTwitter(ctx, //
-						accesssToken.GetScreenName(), //
-						accesssToken.GetUserID(),     //
-						accesssToken.GetOAuthToken()) //
-					if err1 != nil {
-						return map[string]string{"errcode": "2", "errindo": err1.Error()}
-					}
-					tokenObj, err := sessionMgrObj.Login(ctx, //
-						userObj.GetUserName(), //
-						minisession.MakeAccessTokenConfigFromRequest(r))
-					if err != nil {
-						return map[string]string{"errcode": "1"}
-					} else {
-						return map[string]string{"token": "" + tokenObj.GetLoginId(), "userName": userObj.GetOriginalUserName()}
-					}
-				},
+				AccessTokenSecret: TwitterAccessTokenSecret,
 			})
 	}
 	return twitterHandlerObj
@@ -218,7 +188,7 @@ func initApi() {
 		propObj := miniprop.NewMiniPropFromJson(bodyBytes)
 		token := propObj.GetString("token", "")
 		ctx := appengine.NewContext(r)
-		GetSessionMgrObj(ctx).Logout(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+		GetUserHundlerObj(ctx).GetSessionMgr().Logout(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
 	})
 
 }
