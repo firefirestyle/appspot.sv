@@ -178,7 +178,7 @@ func initApi() {
 	})
 	http.HandleFunc(UrlUserFind, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
-		GetUserHundlerObj(appengine.NewContext(r)).HandleGet(w, r)
+		GetUserHundlerObj(appengine.NewContext(r)).HandleFind(w, r)
 	})
 
 	// me
