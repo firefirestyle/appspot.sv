@@ -46,6 +46,8 @@ const (
 	UrlUserFind       = "/api/v1/user/find"
 	UrlMeLogout       = "/api/v1/me/logout"
 	UrlArtNew         = "/api/v1/art/new"
+	UrlArtUpdate      = "/api/v1/art/update"
+	UrlArtFind        = "/api/v1/art/find"
 )
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
@@ -176,7 +178,7 @@ func initApi() {
 	// blob
 	http.HandleFunc(UrlBlobRequestUrl, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
-		GetBlobHandlerObj(appengine.NewContext(r)).BlobRequestToken(w, r)
+		GetBlobHandlerObj(appengine.NewContext(r)).HandleBlobRequestToken(w, r)
 	})
 
 	http.HandleFunc(UrlBlobCallback, func(w http.ResponseWriter, r *http.Request) {
@@ -215,6 +217,20 @@ func initApi() {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		ctx := appengine.NewContext(r)
 		GetArtHundlerObj(ctx).HandleNew(w, r)
+	})
+
+	// art
+	// UrlArtNew
+	http.HandleFunc(UrlArtUpdate, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		ctx := appengine.NewContext(r)
+		GetArtHundlerObj(ctx).HandleUpdate(w, r)
+	})
+
+	http.HandleFunc(UrlArtFind, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		ctx := appengine.NewContext(r)
+		GetArtHundlerObj(ctx).HandleFind(w, r)
 	})
 }
 
