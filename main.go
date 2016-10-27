@@ -6,6 +6,7 @@ import (
 
 	//	"errors"
 
+	arthundler "github.com/firefirestyle/go.miniarticle/hundler"
 	"github.com/firefirestyle/go.miniblob"
 	"github.com/firefirestyle/go.minioauth/twitter"
 	"github.com/firefirestyle/go.miniprop"
@@ -44,12 +45,29 @@ const (
 	UrlUserGet        = "/api/v1/user/get"
 	UrlUserFind       = "/api/v1/user/find"
 	UrlMeLogout       = "/api/v1/me/logout"
+	UrlArtNew         = "/api/v1/art/new"
 )
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
 var blobHandlerObj *miniblob.BlobHandler = nil
 var sessionMgrObj *minisession.SessionManager = nil
 var userHandlerObj *userhundler.UserHandler = nil
+var artHandlerObj *arthundler.ArticleHandler = nil
+
+func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
+	if artHandlerObj == nil {
+		artHandlerObj = arthundler.NewArtHandler(
+			arthundler.ArticleHandlerManagerConfig{
+				ProjectId:       "firefirestyle",
+				ArticleKind:     "article",
+				BlobKind:        "artblob",
+				BlobCallbackUrl: "",
+				BlobSign:        appengine.VersionID(ctx),
+			}, //
+			arthundler.ArticleHandlerOnEvent{})
+	}
+	return artHandlerObj
+}
 
 func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 	if userHandlerObj == nil {
@@ -191,6 +209,13 @@ func initApi() {
 		GetUserHundlerObj(ctx).GetSessionMgr().Logout(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
 	})
 
+	// art
+	// UrlArtNew
+	http.HandleFunc(UrlArtNew, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		ctx := appengine.NewContext(r)
+		GetArtHundlerObj(ctx).HandleNew(w, r)
+	})
 }
 
 func Debug(ctx context.Context, message string) {
