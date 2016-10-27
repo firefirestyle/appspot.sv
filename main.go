@@ -48,6 +48,7 @@ const (
 	UrlArtNew         = "/api/v1/art/new"
 	UrlArtUpdate      = "/api/v1/art/update"
 	UrlArtFind        = "/api/v1/art/find"
+	UrlArtGet         = "/api/v1/art/get"
 )
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
@@ -232,6 +233,13 @@ func initApi() {
 		ctx := appengine.NewContext(r)
 		GetArtHundlerObj(ctx).HandleFind(w, r)
 	})
+
+	http.HandleFunc(UrlArtGet, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		ctx := appengine.NewContext(r)
+		GetArtHundlerObj(ctx).HandleGet(w, r)
+	})
+	//UrlArtGet
 }
 
 func Debug(ctx context.Context, message string) {
