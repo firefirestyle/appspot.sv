@@ -7,7 +7,8 @@ import (
 	//	"errors"
 
 	arthundler "github.com/firefirestyle/go.miniarticle/hundler"
-	"github.com/firefirestyle/go.miniblob"
+	miniblob "github.com/firefirestyle/go.miniblob/blob"
+	blobhandler "github.com/firefirestyle/go.miniblob/handler"
 	"github.com/firefirestyle/go.minioauth/twitter"
 	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
@@ -39,20 +40,22 @@ const (
 	UrlTwitterTokenUrlRedirect = "/api/v1/twitter/tokenurl/redirect"
 	UrlTwitterTokenCallback    = "/api/v1/twitter/tokenurl/callback"
 
-	UrlBlobRequestUrl = "/api/v1/blob/requesturl"
-	UrlBlobCallback   = "/api/v1/blob/callback"
-	UrlBlobGet        = "/api/v1/blob/get"
-	UrlUserGet        = "/api/v1/user/get"
-	UrlUserFind       = "/api/v1/user/find"
-	UrlMeLogout       = "/api/v1/me/logout"
-	UrlArtNew         = "/api/v1/art/new"
-	UrlArtUpdate      = "/api/v1/art/update"
-	UrlArtFind        = "/api/v1/art/find"
-	UrlArtGet         = "/api/v1/art/get"
+	UrlBlobRequestUrl     = "/api/v1/blob/requesturl"
+	UrlBlobCallback       = "/api/v1/blob/callback"
+	UrlBlobGet            = "/api/v1/blob/get"
+	UrlUserGet            = "/api/v1/user/get"
+	UrlUserFind           = "/api/v1/user/find"
+	UrlMeLogout           = "/api/v1/me/logout"
+	UrlArtNew             = "/api/v1/art/new"
+	UrlArtUpdate          = "/api/v1/art/update"
+	UrlArtFind            = "/api/v1/art/find"
+	UrlArtGet             = "/api/v1/art/get"
+	UrlArtRequestBlobUrl  = "/api/v1/art/requestbloburl"
+	UrlArtCallbackBlobUrl = "/api/v1/art/callbackbloburl"
 )
 
 var twitterHandlerObj *twitter.TwitterHandler = nil
-var blobHandlerObj *miniblob.BlobHandler = nil
+var blobHandlerObj *blobhandler.BlobHandler = nil
 var sessionMgrObj *minisession.SessionManager = nil
 var userHandlerObj *userhundler.UserHandler = nil
 var artHandlerObj *arthundler.ArticleHandler = nil
@@ -64,7 +67,7 @@ func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
 				ProjectId:       "firefirestyle",
 				ArticleKind:     "article",
 				BlobKind:        "artblob",
-				BlobCallbackUrl: "",
+				BlobCallbackUrl: UrlArtCallbackBlobUrl,
 				BlobSign:        appengine.VersionID(ctx),
 			}, //
 			arthundler.ArticleHandlerOnEvent{})
@@ -84,17 +87,17 @@ func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 	return userHandlerObj
 }
 
-func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
+func GetBlobHandlerObj(ctx context.Context) *blobhandler.BlobHandler {
 	if blobHandlerObj == nil {
-		blobHandlerObj = miniblob.NewBlobHandler(
+		blobHandlerObj = blobhandler.NewBlobHandler(
 			UrlBlobCallback, appengine.VersionID(ctx), //
 			miniblob.BlobManagerConfig{
 				ProjectId:   "firefirestyle",
 				Kind:        "blobstore",
 				CallbackUrl: UrlBlobCallback,
 			},
-			miniblob.BlobHandlerOnEvent{
-				OnRequest: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *miniblob.BlobHandler) (string, map[string]string, error) {
+			blobhandler.BlobHandlerOnEvent{
+				OnRequest: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *blobhandler.BlobHandler) (string, map[string]string, error) {
 					//
 					// login check
 					bodyBytes, _ := ioutil.ReadAll(r.Body)
@@ -119,7 +122,7 @@ func GetBlobHandlerObj(ctx context.Context) *miniblob.BlobHandler {
 					}
 					return loginCheckInfo.AccessTokenObj.GetLoginId(), map[string]string{}, nil
 				},
-				OnComplete: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *miniblob.BlobHandler, blobObj *miniblob.BlobItem) error {
+				OnComplete: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *blobhandler.BlobHandler, blobObj *miniblob.BlobItem) error {
 					dir := r.URL.Query().Get("dir")
 					if true == strings.HasPrefix(dir, "/user") {
 						ctx := appengine.NewContext(r)
@@ -240,6 +243,21 @@ func initApi() {
 		GetArtHundlerObj(ctx).HandleGet(w, r)
 	})
 	//UrlArtGet
+
+	http.HandleFunc(UrlArtRequestBlobUrl, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		ctx := appengine.NewContext(r)
+		GetArtHundlerObj(ctx).HandleBlobRequestToken(w, r)
+	})
+
+	http.HandleFunc(UrlArtCallbackBlobUrl, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		ctx := appengine.NewContext(r)
+		Debug(ctx, "asdfasdfasdf")
+
+		GetArtHundlerObj(ctx).HandleBlobUpdated(w, r)
+	})
+
 }
 
 func Debug(ctx context.Context, message string) {
