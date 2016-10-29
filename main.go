@@ -67,6 +67,7 @@ func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
 				ProjectId:       "firefirestyle",
 				ArticleKind:     "article",
 				BlobKind:        "artblob",
+				PointerKind:     "artpointer",
 				BlobCallbackUrl: UrlArtCallbackBlobUrl,
 				BlobSign:        appengine.VersionID(ctx),
 			}, //
@@ -97,7 +98,7 @@ func GetBlobHandlerObj(ctx context.Context) *blobhandler.BlobHandler {
 				CallbackUrl: UrlBlobCallback,
 			},
 			blobhandler.BlobHandlerOnEvent{
-				OnRequest: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *blobhandler.BlobHandler) (string, map[string]string, error) {
+				OnBlobRequest: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *blobhandler.BlobHandler) (string, map[string]string, error) {
 					//
 					// login check
 					bodyBytes, _ := ioutil.ReadAll(r.Body)
@@ -122,7 +123,7 @@ func GetBlobHandlerObj(ctx context.Context) *blobhandler.BlobHandler {
 					}
 					return loginCheckInfo.AccessTokenObj.GetLoginId(), map[string]string{}, nil
 				},
-				OnComplete: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *blobhandler.BlobHandler, blobObj *miniblob.BlobItem) error {
+				OnBlobComplete: func(w http.ResponseWriter, r *http.Request, outputProp *miniprop.MiniProp, blobHandlerObj *blobhandler.BlobHandler, blobObj *miniblob.BlobItem) error {
 					dir := r.URL.Query().Get("dir")
 					if true == strings.HasPrefix(dir, "/user") {
 						ctx := appengine.NewContext(r)
