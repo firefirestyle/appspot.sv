@@ -4,14 +4,15 @@ import (
 	"net/http"
 	//	"net/url"
 
-	//	"errors"
+	"errors"
 
 	arthundler "github.com/firefirestyle/go.miniarticle/hundler"
 	//	miniblob "github.com/firefirestyle/go.miniblob/blob"
-	//	blobhandler "github.com/firefirestyle/go.miniblob/handler"
+	blobhandler "github.com/firefirestyle/go.miniblob/handler"
 	"github.com/firefirestyle/go.minioauth/twitter"
 	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
+
 	//	"github.com/firefirestyle/go.miniuser"
 	userhundler "github.com/firefirestyle/go.miniuser/handler"
 	//
@@ -74,7 +75,23 @@ func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
 				BlobCallbackUrl: UrlArtCallbackBlobUrl,
 				BlobSign:        appengine.VersionID(ctx),
 			}, //
-			arthundler.ArticleHandlerOnEvent{})
+			arthundler.ArticleHandlerOnEvent{
+				BlobOnEvent: blobhandler.BlobHandlerOnEvent{
+					OnBlobRequest: func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (string, map[string]string, error) {
+						//dir := input.GetString("dir", "")
+						token := input.GetString("token", "")
+						if token == "" {
+							return "", map[string]string{}, errors.New("Not Found TOKEN")
+						}
+						ctx := appengine.NewContext(r)
+						ret := GetUserHundlerObj(ctx).GetSessionMgr().CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+						if ret.IsLogin == false {
+							return "", map[string]string{}, errors.New("Failed in token check")
+						}
+						return ret.AccessTokenObj.GetLoginId(), map[string]string{}, nil
+					},
+				},
+			})
 	}
 	return artHandlerObj
 }
@@ -87,7 +104,23 @@ func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 				UserKind:    "user",
 				RelayIdKind: "relayId",
 				SessionKind: "session",
-			}, userhundler.UserHandlerOnEvent{})
+			}, userhundler.UserHandlerOnEvent{
+				BlobOnEvent: blobhandler.BlobHandlerOnEvent{
+					OnBlobRequest: func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (string, map[string]string, error) {
+						//dir := input.GetString("dir", "")
+						token := input.GetString("token", "")
+						if token == "" {
+							return "", map[string]string{}, errors.New("Not Found TOKEN")
+						}
+						ctx := appengine.NewContext(r)
+						ret := GetUserHundlerObj(ctx).GetSessionMgr().CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+						if ret.IsLogin == false {
+							return "", map[string]string{}, errors.New("Failed in token check")
+						}
+						return ret.AccessTokenObj.GetLoginId(), map[string]string{}, nil
+					},
+				},
+			})
 	}
 	return userHandlerObj
 }
