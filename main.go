@@ -50,6 +50,7 @@ const (
 	UrlArtUpdate          = "/api/v1/art/update"
 	UrlArtFind            = "/api/v1/art/find"
 	UrlArtGet             = "/api/v1/art/get"
+	UrlArtBlobGet         = "/api/v1/art/getblob"
 	UrlArtRequestBlobUrl  = "/api/v1/art/requestbloburl"
 	UrlArtCallbackBlobUrl = "/api/v1/art/callbackbloburl"
 )
@@ -95,6 +96,7 @@ func GetBlobHandlerObj(ctx context.Context) *blobhandler.BlobHandler {
 			miniblob.BlobManagerConfig{
 				ProjectId:   "firefirestyle",
 				Kind:        "blobstore",
+				PointerKind: "blobstorepointer",
 				CallbackUrl: UrlBlobCallback,
 			},
 			blobhandler.BlobHandlerOnEvent{
@@ -129,7 +131,7 @@ func GetBlobHandlerObj(ctx context.Context) *blobhandler.BlobHandler {
 						ctx := appengine.NewContext(r)
 						userName := strings.Replace(dir, "/user/", "", -1)
 						userMgrObj := GetUserHundlerObj(ctx)
-						userObj, userErr := userMgrObj.GetUserFromUserNameAndRelayId(ctx, userName)
+						userObj, userErr := userMgrObj.GetUserFromRelayId(ctx, userName)
 						if userErr != nil {
 							outputProp.SetString("error", "not found user")
 							return userErr
@@ -257,6 +259,14 @@ func initApi() {
 		Debug(ctx, "asdfasdfasdf")
 
 		GetArtHundlerObj(ctx).HandleBlobUpdated(w, r)
+	})
+
+	http.HandleFunc(UrlArtBlobGet, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		ctx := appengine.NewContext(r)
+		Debug(ctx, "asdfasdfasdf")
+
+		GetArtHundlerObj(ctx).HandleBlobGet(w, r)
 	})
 
 }
