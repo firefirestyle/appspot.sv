@@ -2,38 +2,33 @@ package firestylesv
 
 import (
 	"net/http"
-	//	"net/url"
 
 	"errors"
 
+	"github.com/firefirestyle/go.miniarticle/article"
 	arthundler "github.com/firefirestyle/go.miniarticle/hundler"
-	//	miniblob "github.com/firefirestyle/go.miniblob/blob"
 	blobhandler "github.com/firefirestyle/go.miniblob/handler"
 	"github.com/firefirestyle/go.minioauth/twitter"
 	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
 
-	//	"github.com/firefirestyle/go.miniuser"
 	userhundler "github.com/firefirestyle/go.miniuser/handler"
 	//
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	//
-	//"crypto/rand"
-	//"encoding/binary"
-	//"strconv"
-	"io/ioutil"
 
-	//	"google.golang.org/appengine/blobstore"
+	"io/ioutil"
 )
 
+/*
 const (
 	UrlTwitterTokenUrlRedirect_callbackUrl              = "cb"
 	UrlTwitterTokenUrlRedirect_errorNotFoundCallbackUrl = "1001"
 	UrlTwitterTokenUrlRedirect_errorFailedToMakeToken   = "1002"
 	UrlTwitterTokenCallback_callbackUrl                 = "cb"
-)
+)*/
 
 const (
 	UrlTwitterTokenUrlRedirect = "/api/v1/twitter/tokenurl/redirect"
@@ -64,6 +59,12 @@ var sessionMgrObj *minisession.SessionManager = nil
 var userHandlerObj *userhundler.UserHandler = nil
 var artHandlerObj *arthundler.ArticleHandler = nil
 
+func CheckLogin(r *http.Request, input *miniprop.MiniProp) minisession.CheckLoginIdResult {
+	ctx := appengine.NewContext(r)
+	token := input.GetString("token", "")
+	return GetUserHundlerObj(ctx).GetSessionMgr().CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+}
+
 func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
 	if artHandlerObj == nil {
 		artHandlerObj = arthundler.NewArtHandler(
@@ -76,15 +77,34 @@ func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
 				BlobSign:        appengine.VersionID(ctx),
 			}, //
 			arthundler.ArticleHandlerOnEvent{
+				//				OnNewRequest: func(w http.ResponseWriter, r *http.Request, handler *arthundler.ArticleHandler, input *miniprop.MiniProp, output *miniprop.MiniProp) error {
+				//					ret := CheckLogin(r, input)
+				//					if ret.IsLogin == false {
+				//						return errors.New("Failed in token check")
+				//					} else {
+				//						return nil
+				//					}
+				//				},
+				OnNewBeforeSave: func(w http.ResponseWriter, r *http.Request, handler *arthundler.ArticleHandler, artObj *article.Article, input *miniprop.MiniProp, output *miniprop.MiniProp) error {
+					ret := CheckLogin(r, input)
+					if ret.IsLogin == false {
+						return errors.New("Failed in token check")
+					} else {
+						artObj.SetUserName(ret.AccessTokenObj.GetUserName())
+						return nil
+					}
+				},
+				OnUpdateRequest: func(w http.ResponseWriter, r *http.Request, handler *arthundler.ArticleHandler, input *miniprop.MiniProp, output *miniprop.MiniProp) error {
+					ret := CheckLogin(r, input)
+					if ret.IsLogin == false {
+						return errors.New("Failed in token check")
+					} else {
+						return nil
+					}
+				},
 				BlobOnEvent: blobhandler.BlobHandlerOnEvent{
 					OnBlobRequest: func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (string, map[string]string, error) {
-						//dir := input.GetString("dir", "")
-						token := input.GetString("token", "")
-						if token == "" {
-							return "", map[string]string{}, errors.New("Not Found TOKEN")
-						}
-						ctx := appengine.NewContext(r)
-						ret := GetUserHundlerObj(ctx).GetSessionMgr().CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+						ret := CheckLogin(r, input)
 						if ret.IsLogin == false {
 							return "", map[string]string{}, errors.New("Failed in token check")
 						}
@@ -107,13 +127,7 @@ func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 			}, userhundler.UserHandlerOnEvent{
 				BlobOnEvent: blobhandler.BlobHandlerOnEvent{
 					OnBlobRequest: func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (string, map[string]string, error) {
-						//dir := input.GetString("dir", "")
-						token := input.GetString("token", "")
-						if token == "" {
-							return "", map[string]string{}, errors.New("Not Found TOKEN")
-						}
-						ctx := appengine.NewContext(r)
-						ret := GetUserHundlerObj(ctx).GetSessionMgr().CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+						ret := CheckLogin(r, input)
 						if ret.IsLogin == false {
 							return "", map[string]string{}, errors.New("Failed in token check")
 						}
@@ -128,11 +142,13 @@ func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 func GetTwitterHandlerObj(ctx context.Context) *twitter.TwitterHandler {
 	if twitterHandlerObj == nil {
 		twitterHandlerObj = GetUserHundlerObj(ctx).GetTwitterHandlerObj(ctx, //
-			"http://"+appengine.DefaultVersionHostname(ctx)+""+UrlTwitterTokenCallback, twitter.TwitterOAuthConfig{
+			twitter.TwitterOAuthConfig{
 				ConsumerKey:       TwitterConsumerKey,
 				ConsumerSecret:    TwitterConsumerSecret,
 				AccessToken:       TwitterAccessToken,
 				AccessTokenSecret: TwitterAccessTokenSecret,
+				CallbackUrl:       "http://" + appengine.DefaultVersionHostname(ctx) + "" + UrlTwitterTokenCallback,
+				SecretSign:        appengine.VersionID(ctx),
 			})
 	}
 	return twitterHandlerObj
@@ -153,11 +169,11 @@ func initApi() {
 	// twitter
 	http.HandleFunc(UrlTwitterTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
-		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginEntry(w, r)
+		GetTwitterHandlerObj(appengine.NewContext(r)).HandleLoginEntry(w, r)
 	})
 	http.HandleFunc(UrlTwitterTokenCallback, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
-		GetTwitterHandlerObj(appengine.NewContext(r)).TwitterLoginExit(w, r)
+		GetTwitterHandlerObj(appengine.NewContext(r)).HandleLoginExit(w, r)
 	})
 
 	// user
