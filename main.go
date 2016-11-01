@@ -8,6 +8,7 @@ import (
 	"github.com/firefirestyle/go.miniarticle/article"
 	arthundler "github.com/firefirestyle/go.miniarticle/hundler"
 	blobhandler "github.com/firefirestyle/go.miniblob/handler"
+	"github.com/firefirestyle/go.minioauth/facebook"
 	"github.com/firefirestyle/go.minioauth/twitter"
 	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
@@ -31,8 +32,10 @@ const (
 )*/
 
 const (
-	UrlTwitterTokenUrlRedirect = "/api/v1/twitter/tokenurl/redirect"
-	UrlTwitterTokenCallback    = "/api/v1/twitter/tokenurl/callback"
+	UrlTwitterTokenUrlRedirect  = "/api/v1/twitter/tokenurl/redirect"
+	UrlTwitterTokenCallback     = "/api/v1/twitter/tokenurl/callback"
+	UrlFacebookTokenUrlRedirect = "/api/v1/facebook/tokenurl/redirect"
+	UrlFacebookTokenCallback    = "/api/v1/facebook/tokenurl/callback"
 
 	UrlBlobRequestUrl      = "/api/v1/blob/requesturl"
 	UrlBlobCallback        = "/api/v1/blob/callback"
@@ -107,6 +110,10 @@ func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
 
 func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 	if userHandlerObj == nil {
+		v := appengine.DefaultVersionHostname(ctx)
+		if v == "127.0.0.1:8080" {
+			v = "localhost:8080"
+		}
 		userHandlerObj = userhundler.NewUserHandler(UrlUserCallbackBlobUrl,
 			userhundler.UserHandlerManagerConfig{ //
 				ProjectId:   "firefirestyle",
@@ -122,6 +129,12 @@ func GetUserHundlerObj(ctx context.Context) *userhundler.UserHandler {
 				CallbackUrl:       "http://" + appengine.DefaultVersionHostname(ctx) + "" + UrlTwitterTokenCallback,
 				SecretSign:        appengine.VersionID(ctx),
 			}, //
+			facebook.FacebookOAuthConfig{
+				ConfigFacebookAppSecret: ConfigFacebookAppSecret,
+				ConfigFacebookAppId:     ConfigFacebookAppId,
+				SecretSign:              appengine.VersionID(ctx),
+				CallbackUrl:             "http://" + v + "" + UrlFacebookTokenCallback,
+			},
 			userhundler.UserHandlerOnEvent{}, //
 			blobhandler.BlobHandlerOnEvent{
 				OnBlobRequest: func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (string, map[string]string, error) {
@@ -158,6 +171,15 @@ func initApi() {
 		GetUserHundlerObj(appengine.NewContext(r)).HandleTwitterCallbackToken(w, r)
 	})
 
+	// twitter
+	http.HandleFunc(UrlFacebookTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		GetUserHundlerObj(appengine.NewContext(r)).HandleFacebookRequestToken(w, r)
+	})
+	http.HandleFunc(UrlFacebookTokenCallback, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		GetUserHundlerObj(appengine.NewContext(r)).HandleFacebookCallbackToken(w, r)
+	})
 	// user
 	http.HandleFunc(UrlUserGet, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
