@@ -32,27 +32,33 @@ const (
 )*/
 
 const (
+	// user
 	UrlTwitterTokenUrlRedirect  = "/api/v1/twitter/tokenurl/redirect"
 	UrlTwitterTokenCallback     = "/api/v1/twitter/tokenurl/callback"
 	UrlFacebookTokenUrlRedirect = "/api/v1/facebook/tokenurl/redirect"
 	UrlFacebookTokenCallback    = "/api/v1/facebook/tokenurl/callback"
+	UrlMeLogout                 = "/api/v1/me/logout"
+	UrlMeUpdate                 = "/api/v1/me/update"
 
-	UrlBlobRequestUrl      = "/api/v1/blob/requesturl"
-	UrlBlobCallback        = "/api/v1/blob/callback"
-	UrlBlobGet             = "/api/v1/blob/get"
 	UrlUserGet             = "/api/v1/user/get"
 	UrlUserFind            = "/api/v1/user/find"
 	UrlUserBlobGet         = "/api/v1/user/getblob"
 	UrlUserRequestBlobUrl  = "/api/v1/user/requestbloburl"
 	UrlUserCallbackBlobUrl = "/api/v1/user/callbackbloburl"
-	UrlMeLogout            = "/api/v1/me/logout"
-	UrlArtNew              = "/api/v1/art/new"
-	UrlArtUpdate           = "/api/v1/art/update"
-	UrlArtFind             = "/api/v1/art/find"
-	UrlArtGet              = "/api/v1/art/get"
-	UrlArtBlobGet          = "/api/v1/art/getblob"
-	UrlArtRequestBlobUrl   = "/api/v1/art/requestbloburl"
-	UrlArtCallbackBlobUrl  = "/api/v1/art/callbackbloburl"
+
+	//
+	UrlArtNew             = "/api/v1/art/new"
+	UrlArtUpdate          = "/api/v1/art/update"
+	UrlArtFind            = "/api/v1/art/find"
+	UrlArtGet             = "/api/v1/art/get"
+	UrlArtBlobGet         = "/api/v1/art/getblob"
+	UrlArtRequestBlobUrl  = "/api/v1/art/requestbloburl"
+	UrlArtCallbackBlobUrl = "/api/v1/art/callbackbloburl"
+
+	// blob
+	UrlBlobRequestUrl = "/api/v1/blob/requesturl"
+	UrlBlobCallback   = "/api/v1/blob/callback"
+	UrlBlobGet        = "/api/v1/blob/get"
 )
 
 var sessionMgrObj *minisession.SessionManager = nil
@@ -171,7 +177,7 @@ func initApi() {
 		GetUserHundlerObj(appengine.NewContext(r)).HandleTwitterCallbackToken(w, r)
 	})
 
-	// twitter
+	// facebook
 	http.HandleFunc(UrlFacebookTokenUrlRedirect, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		GetUserHundlerObj(appengine.NewContext(r)).HandleFacebookRequestToken(w, r)
@@ -210,6 +216,11 @@ func initApi() {
 		token := propObj.GetString("token", "")
 		ctx := appengine.NewContext(r)
 		GetUserHundlerObj(ctx).GetSessionMgr().Logout(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
+	})
+
+	http.HandleFunc(UrlMeUpdate, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		GetUserHundlerObj(appengine.NewContext(r)).HandleUpdateInfo(w, r)
 	})
 
 	// art
