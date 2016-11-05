@@ -3,23 +3,11 @@ package firestylesv
 import (
 	"net/http"
 
-	//	"errors"
-
-	//	"github.com/firefirestyle/go.miniarticle/article"
-	arthundler "github.com/firefirestyle/go.miniarticle/hundler"
-	//	blobhandler "github.com/firefirestyle/go.miniblob/handler"
-	//	"github.com/firefirestyle/go.miniprop"
-	"github.com/firefirestyle/go.minisession"
 	userTmp "github.com/firefirestyle/go.miniuser/template"
 
-	userhundler "github.com/firefirestyle/go.miniuser/handler"
-	//
-	"golang.org/x/net/context"
-	//	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
-	//
 	artTmp "github.com/firefirestyle/go.miniarticle/template"
-	//"io/ioutil"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/log"
 )
 
 /*
@@ -47,9 +35,6 @@ const (
 	UrlBlobGet        = "/api/v1/blob/get"
 )
 
-var sessionMgrObj *minisession.SessionManager = nil
-var userHandlerObj *userhundler.UserHandler = nil
-var artHandlerObj *arthundler.ArticleHandler = nil
 var userTemplate = userTmp.NewUserTemplate(userConfig)
 var artTemplate *artTmp.ArtTemplate = artTmp.NewArtTemplate(artTmp.ArtTemplateConfig{
 	GroupName:    "Main",
