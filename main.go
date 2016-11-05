@@ -3,22 +3,22 @@ package firestylesv
 import (
 	"net/http"
 
-	"errors"
+	//	"errors"
 
-	"github.com/firefirestyle/go.miniarticle/article"
+	//	"github.com/firefirestyle/go.miniarticle/article"
 	arthundler "github.com/firefirestyle/go.miniarticle/hundler"
-	blobhandler "github.com/firefirestyle/go.miniblob/handler"
-	"github.com/firefirestyle/go.miniprop"
+	//	blobhandler "github.com/firefirestyle/go.miniblob/handler"
+	//	"github.com/firefirestyle/go.miniprop"
 	"github.com/firefirestyle/go.minisession"
 	userTmp "github.com/firefirestyle/go.miniuser/template"
 
 	userhundler "github.com/firefirestyle/go.miniuser/handler"
 	//
 	"golang.org/x/net/context"
-	"google.golang.org/appengine"
+	//	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	//
-
+	artTmp "github.com/firefirestyle/go.miniarticle/template"
 	//"io/ioutil"
 )
 
@@ -51,119 +51,21 @@ var sessionMgrObj *minisession.SessionManager = nil
 var userHandlerObj *userhundler.UserHandler = nil
 var artHandlerObj *arthundler.ArticleHandler = nil
 var userTemplate = userTmp.NewUserTemplate(userConfig)
-
-func CheckLogin(r *http.Request, input *miniprop.MiniProp) minisession.CheckLoginIdResult {
-	ctx := appengine.NewContext(r)
-	token := input.GetString("token", "")
-	return userTemplate.GetUserHundlerObj(ctx).GetSessionMgr().CheckLoginId(ctx, token, minisession.MakeAccessTokenConfigFromRequest(r))
-}
-
-func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
-	if artHandlerObj == nil {
-		artHandlerObj = arthundler.NewArtHandler(
-			arthundler.ArticleHandlerManagerConfig{
-				RootGroup:       "firefirestyle",
-				ArticleKind:     "article",
-				BlobKind:        "artblob",
-				PointerKind:     "artpointer",
-				BlobCallbackUrl: UrlArtCallbackBlobUrl,
-				BlobSign:        appengine.VersionID(ctx),
-			}, //
-			arthundler.ArticleHandlerOnEvent{
-				OnNewBeforeSave: func(w http.ResponseWriter, r *http.Request, handler *arthundler.ArticleHandler, artObj *article.Article, input *miniprop.MiniProp, output *miniprop.MiniProp) error {
-					ret := CheckLogin(r, input)
-					if ret.IsLogin == false {
-						return errors.New("Failed in token check")
-					} else {
-						artObj.SetUserName(ret.AccessTokenObj.GetUserName())
-						return nil
-					}
-				},
-				OnUpdateRequest: func(w http.ResponseWriter, r *http.Request, handler *arthundler.ArticleHandler, input *miniprop.MiniProp, output *miniprop.MiniProp) error {
-					ret := CheckLogin(r, input)
-					if ret.IsLogin == false {
-						return errors.New("Failed in token check")
-					} else {
-						return nil
-					}
-				},
-			})
-		artHandlerObj.GetBlobHandler().AddOnBlobRequest(func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (map[string]string, error) {
-			ret := CheckLogin(r, input)
-			if ret.IsLogin == false {
-				return map[string]string{}, errors.New("Failed in token check")
-			}
-			return map[string]string{"sst": ret.AccessTokenObj.GetLoginId()}, nil
-		})
-	}
-	return artHandlerObj
-}
+var artTemplate *artTmp.ArtTemplate = artTmp.NewArtTemplate(artTmp.ArtTemplateConfig{
+	GroupName:    "Main",
+	KindBaseName: "FFArt",
+}, userTemplate.GetUserHundlerObj)
 
 func init() {
-	initApi()
 	initHomepage()
 	userTemplate.InitUserApi()
+	artTemplate.InitArtApi()
 }
 
 func initHomepage() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Welcome to FireFireStyle!!"))
 	})
-}
-
-func initApi() {
-
-	// art
-	// UrlArtNew
-	http.HandleFunc(UrlArtNew, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		ctx := appengine.NewContext(r)
-		GetArtHundlerObj(ctx).HandleNew(w, r)
-	})
-
-	// art
-	// UrlArtNew
-	http.HandleFunc(UrlArtUpdate, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		ctx := appengine.NewContext(r)
-		GetArtHundlerObj(ctx).HandleUpdate(w, r)
-	})
-
-	http.HandleFunc(UrlArtFind, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		ctx := appengine.NewContext(r)
-		GetArtHundlerObj(ctx).HandleFind(w, r)
-	})
-
-	http.HandleFunc(UrlArtGet, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		ctx := appengine.NewContext(r)
-		GetArtHundlerObj(ctx).HandleGet(w, r)
-	})
-	//UrlArtGet
-
-	http.HandleFunc(UrlArtRequestBlobUrl, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		ctx := appengine.NewContext(r)
-		GetArtHundlerObj(ctx).HandleBlobRequestToken(w, r)
-	})
-
-	http.HandleFunc(UrlArtCallbackBlobUrl, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		ctx := appengine.NewContext(r)
-		Debug(ctx, "asdfasdfasdf")
-
-		GetArtHundlerObj(ctx).HandleBlobUpdated(w, r)
-	})
-
-	http.HandleFunc(UrlArtBlobGet, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Access-Control-Allow-Origin", "*")
-		ctx := appengine.NewContext(r)
-		Debug(ctx, "asdfasdfasdf")
-
-		GetArtHundlerObj(ctx).HandleBlobGet(w, r)
-	})
-
 }
 
 func Debug(ctx context.Context, message string) {
