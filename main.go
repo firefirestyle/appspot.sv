@@ -88,12 +88,12 @@ func GetArtHundlerObj(ctx context.Context) *arthundler.ArticleHandler {
 					}
 				},
 			})
-		artHandlerObj.GetBlobHandler().AddOnBlobRequest(func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (string, map[string]string, error) {
+		artHandlerObj.GetBlobHandler().AddOnBlobRequest(func(w http.ResponseWriter, r *http.Request, input *miniprop.MiniProp, output *miniprop.MiniProp, h *blobhandler.BlobHandler) (map[string]string, error) {
 			ret := CheckLogin(r, input)
 			if ret.IsLogin == false {
-				return "", map[string]string{}, errors.New("Failed in token check")
+				return map[string]string{}, errors.New("Failed in token check")
 			}
-			return ret.AccessTokenObj.GetLoginId(), map[string]string{}, nil
+			return map[string]string{"sst": ret.AccessTokenObj.GetLoginId()}, nil
 		})
 	}
 	return artHandlerObj
