@@ -7,32 +7,8 @@ import (
 
 	artTmp "github.com/firefirestyle/go.miniarticle/template"
 	"golang.org/x/net/context"
+	//	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
-)
-
-/*
-const (
-	UrlTwitterTokenUrlRedirect_callbackUrl              = "cb"
-	UrlTwitterTokenUrlRedirect_errorNotFoundCallbackUrl = "1001"
-	UrlTwitterTokenUrlRedirect_errorFailedToMakeToken   = "1002"
-	UrlTwitterTokenCallback_callbackUrl                 = "cb"
-)*/
-
-const (
-
-	//
-	UrlArtNew             = "/api/v1/art/new"
-	UrlArtUpdate          = "/api/v1/art/update"
-	UrlArtFind            = "/api/v1/art/find"
-	UrlArtGet             = "/api/v1/art/get"
-	UrlArtBlobGet         = "/api/v1/art/getblob"
-	UrlArtRequestBlobUrl  = "/api/v1/art/requestbloburl"
-	UrlArtCallbackBlobUrl = "/api/v1/art/callbackbloburl"
-
-	// blob
-	UrlBlobRequestUrl = "/api/v1/blob/requesturl"
-	UrlBlobCallback   = "/api/v1/blob/callback"
-	UrlBlobGet        = "/api/v1/blob/get"
 )
 
 var userTemplate = userTmp.NewUserTemplate(userConfig)
