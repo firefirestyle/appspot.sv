@@ -13,8 +13,9 @@ import (
 
 var userTemplate = userTmp.NewUserTemplate(userConfig)
 var artTemplate *artTmp.ArtTemplate = artTmp.NewArtTemplate(artTmp.ArtTemplateConfig{
-	GroupName:    "Main",
-	KindBaseName: "FFArt",
+	GroupName:                  "Main",
+	KindBaseName:               "FFArt",
+	MemcachedOnlyInBlobPointer: true,
 }, userTemplate.GetUserHundlerObj)
 
 func init() {
